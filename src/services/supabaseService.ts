@@ -20,24 +20,37 @@ export const supabaseService = {
   },
 
   async saveProduct(product: { id?: string; name: string; price: number }): Promise<Product> {
-    if (product.id) {
-      const { data, error } = await supabase
-        .from('products')
-        .update({ name: product.name, price: product.price })
-        .eq('id', product.id)
-        .select()
-        .single();
-      if (error) throw error;
-      return { id: String(data.id), name: data.name, price: Number(data.price) };
-    } else {
-      const { data, error } = await supabase
-        .from('products')
-        .insert([{ name: product.name, price: product.price }])
-        .select()
-        .single();
-      if (error) throw error;
-      return { id: String(data.id), name: data.name, price: Number(data.price) };
+    const idToUse =
+      product.id ||
+      (typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : String(Date.now()));
+
+    const record = {
+      id: idToUse,
+      name: product.name,
+      price: product.price,
+    };
+
+    const { data, error } = await supabase
+      .from('products')
+      .upsert([record])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao salvar produto no Supabase:', error);
+      throw error;
     }
+
+    return {
+      id: String(data.id),
+      name: data.name,
+      price: Number(data.price),
+      category: data.category,
+      stock: data.stock,
+      created_at: data.created_at,
+    };
   },
 
   async removeProduct(productId: string): Promise<void> {

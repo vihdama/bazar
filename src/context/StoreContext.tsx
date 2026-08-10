@@ -267,15 +267,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (isSupabaseConnected) {
       try {
         const saved = await supabaseService.saveProduct(product);
-        if (product.id) {
-          setProducts((prev) => prev.map((p) => (p.id === saved.id ? saved : p)));
-        } else {
-          setProducts((prev) => [...prev, saved]);
-        }
+        setProducts((prev) => {
+          const exists = prev.some((p) => p.id === saved.id);
+          if (exists) {
+            return prev.map((p) => (p.id === saved.id ? saved : p));
+          } else {
+            return [...prev, saved];
+          }
+        });
         showToast('Produto salvo no Supabase!');
         return;
-      } catch (err) {
+      } catch (err: any) {
         console.error('Erro ao salvar produto no Supabase:', err);
+        showToast(
+          `Erro no Supabase: ${err.message || 'Falha ao salvar produto'}`,
+          'fa-triangle-exclamation text-red-400'
+        );
+        return;
       }
     }
 
@@ -288,15 +296,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const newId = String(Date.now());
       setProducts((prev) => [...prev, { id: newId, name: product.name, price: product.price }]);
     }
-    showToast('Produto salvo com sucesso!');
+    showToast('Produto salvo localmente!');
   }
 
   async function removeProduct(productId: string) {
     if (isSupabaseConnected) {
       try {
         await supabaseService.removeProduct(productId);
-      } catch (err) {
+        setProducts((prev) => prev.filter((p) => p.id !== productId));
+        showToast('Produto removido do Supabase', 'fa-trash text-red-400');
+        return;
+      } catch (err: any) {
         console.error('Erro ao remover produto do Supabase:', err);
+        showToast(
+          `Erro no Supabase: ${err.message || 'Falha ao remover produto'}`,
+          'fa-triangle-exclamation text-red-400'
+        );
+        return;
       }
     }
     setProducts((prev) => prev.filter((p) => p.id !== productId));

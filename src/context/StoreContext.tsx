@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { CartItem, CashSession, PaymentMethod, Product, Sale } from '../types';
 import { DEFAULT_PRODUCTS } from '../utils/defaultProducts';
-import { isSupabaseConfigured } from '../lib/supabase';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { supabaseService } from '../services/supabaseService';
 import { useToast } from './ToastContext';
 
@@ -105,6 +105,55 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     refreshData();
   }, []);
+
+  // Inscrição Realtime no Supabase para sincronização instantânea entre múltiplos dispositivos
+  useEffect(() => {
+    if (!isSupabaseConfigured || !isSupabaseConnected) return;
+
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'products' },
+        async () => {
+          try {
+            const fetched = await supabaseService.getProducts();
+            setProducts(fetched);
+          } catch (err) {
+            console.error('Erro ao atualizar produtos via realtime:', err);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'sales' },
+        async () => {
+          try {
+            const fetched = await supabaseService.getSales();
+            setSales(fetched);
+          } catch (err) {
+            console.error('Erro ao atualizar vendas via realtime:', err);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'cash_sessions' },
+        async () => {
+          try {
+            const fetched = await supabaseService.getActiveCashSession();
+            setActiveCashSession(fetched);
+          } catch (err) {
+            console.error('Erro ao atualizar caixa via realtime:', err);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isSupabaseConnected]);
 
   // Persistência local como backup
   useEffect(() => {
